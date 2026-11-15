@@ -198,8 +198,9 @@
     const h = el("header", "tarea-testa");
     h.append(el("p", "occhiello", "Tarea " + (i + 1) + " de " + X.taree.length + " · " + String(T.punti).replace(".", ",") + " puntos"), el("h2", null, T.titolo), el("p", "istruzioni", T.istruzioni));
     box.appendChild(h);
-    if (T.opzioni && T.tipo === "menu") {
-      const banca = el("div", "banca"); T.opzioni.forEach((o) => banca.appendChild(el("span", null, o))); box.appendChild(banca);
+    const parole = T.tipo === "menu" ? T.opzioni : T.banca;
+    if (parole) {
+      const banca = el("div", "banca"); parole.forEach((o) => banca.appendChild(el("span", null, o))); box.appendChild(banca);
     }
     const lista = el(T.testo ? "div" : "ol", T.testo ? "testo-continuo" : "voci");
     T.items.forEach((it, n) => {
