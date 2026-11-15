@@ -260,8 +260,26 @@
   }
 
   // ---------- controlli ----------
-  let collegati = false;
+  let collegati = false, ultimoCampo = null;
+  function preparaTastiera() {
+    const t = $("tastiera-acc"); if (!t || t.dataset.ok) return; t.dataset.ok = "1";
+    document.addEventListener("focusin", (e) => { if (e.target.matches && e.target.matches("input.hueco")) ultimoCampo = e.target; });
+    ["á", "é", "í", "ó", "ú", "ü", "ñ", "¿", "¡"].forEach((c) => {
+      const b = el("button", "tasto-acc", c); b.type = "button"; b.tabIndex = -1;
+      b.addEventListener("pointerdown", (e) => e.preventDefault());
+      b.addEventListener("mousedown", (e) => e.preventDefault());
+      b.addEventListener("click", () => {
+        const f = ultimoCampo;
+        if (!f || !document.body.contains(f) || f.disabled) { avviso("Tocca prima la casella in cui vuoi scrivere, poi il carattere."); return; }
+        const a = f.selectionStart ?? f.value.length, z = f.selectionEnd ?? a;
+        f.setRangeText(c, a, z, "end"); f.focus();
+        f.dispatchEvent(new Event("input", { bubbles: true }));
+      });
+      t.appendChild(b);
+    });
+  }
   function collegaEventi() {
+    preparaTastiera();
     if (collegati) return; collegati = true;
     $("btn-prec").addEventListener("click", () => mostraTarea(S.tarea - 1));
     $("btn-succ").addEventListener("click", () => (S.tarea === X.taree.length - 1 ? chiediConferma() : mostraTarea(S.tarea + 1)));
