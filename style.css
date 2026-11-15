@@ -131,3 +131,6 @@ input.correzione{width:16ch}
   .foglio{padding:14px 10px 30px}
   .voci{padding-left:1.5rem;font-size:1.02rem}
 }
+.uscite{font-size:.8rem;color:var(--muted);white-space:nowrap}
+.uscite.poco{color:var(--warn);font-weight:600}
+@media (max-width:520px){.uscite{display:none}}

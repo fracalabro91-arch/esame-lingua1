@@ -4,8 +4,12 @@
   const $ = (id) => document.getElementById(id);
   const CHIAVE = "esame-stato-" + E.versione;
   const SEB = /SEB[\/ ]/i.test(navigator.userAgent);
-  const DOC = /[?&]docente\b/.test(location.search);
   const SEP = "¦";
+  const FS_OK = !SEB && !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+  // Regole di uscita
+  const SOGLIA_S = 10;     // uscite fino a 10 secondi: tollerate (solo registrate)
+  const MAX_LUNGHE = 3;    // alla 3ª uscita oltre i 10 secondi la prova è annullata
+  const MAX_TOTALI = 10;   // oppure alla 10ª uscita in tutto, anche se brevi
 
   let S = null;   // stato salvato
   let X = null;   // esame decifrato
@@ -56,10 +60,6 @@
     $("titolo").textContent = E.titolo;
     $("corso").textContent = E.corso;
     $("docente").textContent = E.docente;
-    if (!SEB) {
-      if (DOC) { $("riquadro-docente").hidden = false; }
-      else { $("blocco-seb").hidden = false; $("form-inizio").hidden = true; }
-    }
     let salvato = null;
     try { salvato = JSON.parse(localStorage.getItem(CHIAVE)); } catch (e) {}
     if (salvato && salvato.consegna) { S = salvato; mostraFine(); if (!S.consegna.inviato) invia(); return; }
@@ -78,28 +78,32 @@
     const err = $("errore-inizio");
     if (!nome || !matricola || !codice) { err.textContent = "Compila nome, matricola e codice d'esame."; return; }
     if (!$("accetto").checked) { err.textContent = "Per iniziare devi accettare le regole."; return; }
-    if (!SEB) {
-      if (!DOC || (await sha($("pwd-docente").value.trim())) !== E.hashDocente) { err.textContent = "La prova si apre solo con Safe Exam Browser."; return; }
-    }
     const btn = $("btn-inizia"); btn.disabled = true; btn.textContent = "Verifica del codice…";
     try { X = await decifra(codice); }
     catch (e) { err.textContent = "Codice d'esame non valido."; btn.disabled = false; btn.textContent = S ? "Riprendi la prova" : "Inizia la prova"; return; }
     const ripresa = !!(S && S.inizio);
     if (!ripresa) {
       S = { nome, matricola, codice: normCod(codice), inizio: Date.now(), r: new Array(X.nSlot).fill(""), err: {}, tarea: 0, log: [],
-            docente: !SEB, contatori: { uscite: 0, gravi: 0, msFuori: 0, incolla: 0, ricariche: 0 } };
-      log("Inizio prova", X.sigla + " (" + X.durataMinuti + " min)" + (SEB ? "" : " – MODALITÀ DOCENTE fuori da SEB"));
+            contatori: { uscite: 0, lunghe: 0, gravi: 0, msFuori: 0, incolla: 0, ricariche: 0 } };
+      log("Inizio prova", X.sigla + " (" + X.durataMinuti + " min) – " + (SEB ? "Safe Exam Browser" : FS_OK ? "browser a schermo intero" : "browser senza schermo intero (solo registro uscite)"));
     } else {
       S.contatori.ricariche++;
       log("Ripresa dopo ricaricamento o chiusura della pagina", "", true);
     }
+    await chiediFS();
     avviaProva();
+  }
+  function inFS() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  async function chiediFS() {
+    if (!FS_OK || inFS()) return;
+    const d = document.documentElement;
+    try { await (d.requestFullscreen ? d.requestFullscreen({ navigationUI: "hide" }) : d.webkitRequestFullscreen()); } catch (e) {}
   }
 
   function ambiente() {
     const ua = navigator.userAgent;
     const so = /Macintosh/.test(ua) && navigator.maxTouchPoints > 1 ? "iPadOS" : /iPad/.test(ua) ? "iPadOS" : /Windows/.test(ua) ? "Windows" : /Mac OS X/.test(ua) ? "macOS" : /Android/.test(ua) ? "Android" : /iPhone/.test(ua) ? "iPhone" : /Linux/.test(ua) ? "Linux" : "altro";
-    return ["SEB: " + (SEB ? "sì" : "no" + (S && S.docente ? " (modalità docente)" : "")), "Sistema: " + so, "Schermo: " + screen.width + "x" + screen.height, "UA: " + ua].join(" | ");
+    return ["SEB: " + (SEB ? "sì" : "no") + " | Schermo intero: " + (FS_OK ? "sì" : "non disponibile"), "Sistema: " + so, "Schermo: " + screen.width + "x" + screen.height, "UA: " + ua].join(" | ");
   }
 
   // ---------- prova ----------
@@ -112,9 +116,15 @@
     costruisciSchede();
     mostraTarea(S.tarea || 0);
     collegaEventi();
+    aggiornaUscite();
     tick(); timerId = setInterval(tick, 1000);
   }
 
+  function aggiornaUscite() {
+    const u = $("uscite"); if (!u) return;
+    u.textContent = "Uscite lunghe " + S.contatori.lunghe + "/" + MAX_LUNGHE;
+    u.classList.toggle("poco", S.contatori.lunghe > 0);
+  }
   function tick() {
     const resta = S.inizio + X.durataMinuti * 60000 - Date.now();
     const t = $("timer"); t.textContent = mmss(resta);
@@ -281,20 +291,40 @@
       }
     }, true);
 
-    const esce = (motivo) => { if (fuori || S.consegna) return; fuori = { inizio: Date.now(), motivo }; S.contatori.uscite++; salva(); };
-    const rientra = () => {
+    const esce = (motivo) => { if (fuori || S.consegna) return; fuori = { inizio: Date.now(), motivo }; salva(); };
+    const rientra = (forza) => {
       if (!fuori || S.consegna) return;
-      const d = Date.now() - fuori.inizio; S.contatori.msFuori += d;
-      log("USCITA DALLA PROVA", fuori.motivo + ", fuori per " + mmss(d), true);
-      fuori = null;
-      if (d > 1500) { $("velo-testo").textContent = "Sei stato fuori dalla prova per " + mmss(d) + ". L'uscita è stata registrata e la docente la vedrà."; $("velo").hidden = false; }
+      if (document.hidden || (!forza && (!document.hasFocus() || (FS_OK && !inFS())))) return;
+      const d = Date.now() - fuori.inizio, motivo = fuori.motivo; fuori = null;
+      S.contatori.uscite++; S.contatori.msFuori += d;
+      const lunga = d > SOGLIA_S * 1000;
+      if (lunga) S.contatori.lunghe++;
+      log(lunga ? "USCITA LUNGA" : "Uscita breve", motivo + ", fuori per " + mmss(d) + " (lunghe " + S.contatori.lunghe + "/" + MAX_LUNGHE + ", totali " + S.contatori.uscite + "/" + MAX_TOTALI + ")", lunga);
+      aggiornaUscite();
+      if (S.contatori.lunghe >= MAX_LUNGHE || S.contatori.uscite >= MAX_TOTALI) {
+        S.annullata = S.contatori.lunghe >= MAX_LUNGHE ? MAX_LUNGHE + " uscite di oltre " + SOGLIA_S + " secondi" : MAX_TOTALI + " uscite in totale";
+        log("PROVA ANNULLATA", S.annullata, true);
+        consegna(false); return;
+      }
+      const restaL = MAX_LUNGHE - S.contatori.lunghe, restaT = MAX_TOTALI - S.contatori.uscite;
+      $("velo-titolo").textContent = lunga ? "Attenzione: uscita registrata" : "Sei uscito dalla prova";
+      $("velo-testo").textContent = (lunga
+        ? "Sei stato fuori per " + mmss(d) + ". Ancora " + restaL + (restaL === 1 ? " uscita" : " uscite") + " di oltre " + SOGLIA_S + " secondi e la prova verrà annullata."
+        : "Sei stato fuori per " + mmss(d) + ". Le uscite brevi sono tollerate, ma alla " + MAX_TOTALI + "ª uscita la prova verrà annullata (ne restano " + restaT + ").");
+      $("velo").hidden = false;
     };
     document.addEventListener("visibilitychange", () => (document.hidden ? esce("pagina nascosta (altra app o scheda)") : rientra()));
-    window.addEventListener("blur", () => setTimeout(() => { if (!document.hasFocus() && !document.querySelector("select:focus")) esce("finestra non attiva"); }, 200));
-    window.addEventListener("focus", rientra);
+    window.addEventListener("blur", () => setTimeout(() => { if (!document.hasFocus() && !document.querySelector("select:focus")) esce("finestra non attiva (altra app o finestra)"); }, 200));
+    window.addEventListener("focus", () => setTimeout(() => rientra(), 50));
     window.addEventListener("pagehide", () => { esce("pagina chiusa o ricaricata"); salva(); });
-    window.addEventListener("beforeunload", (e) => { if (!S.consegna) { e.preventDefault(); e.returnValue = ""; } });
-    $("btn-rientra").addEventListener("click", () => ($("velo").hidden = true));
+    const fsCambio = () => {
+      if (!FS_OK || S.consegna) return;
+      if (!inFS()) { esce("uscita dallo schermo intero"); $("velo-titolo").textContent = "Sei uscito dallo schermo intero"; $("velo-testo").textContent = "Premi «Torna alla prova» subito: se resti fuori più di " + SOGLIA_S + " secondi l'uscita conta come lunga."; $("velo").hidden = false; }
+      else rientra();
+    };
+    document.addEventListener("fullscreenchange", fsCambio);
+    document.addEventListener("webkitfullscreenchange", fsCambio);
+    $("btn-rientra").addEventListener("click", async () => { await chiediFS(); $("velo").hidden = true; rientra(true); });
 
     $("btn-consegna").addEventListener("click", chiediConferma);
     $("btn-annulla").addEventListener("click", () => ($("conferma").hidden = true));
@@ -324,8 +354,8 @@
     const n = X.taree.reduce((a, T) => a + compilate(T), 0), tot = X.taree.reduce((a, T) => a + totaleT(T), 0);
     return [
       "Ricevuta: " + S.consegna.ricevuta,
-      "Esito controlli: " + (gravi.length ? "DA VERIFICARE (" + gravi.length + " eventi segnalati)" : "nessuna anomalia"),
-      "Uscite dalla prova: " + c.uscite + " (tempo fuori " + mmss(c.msFuori) + ")",
+      "Esito controlli: " + (S.annullata ? "PROVA ANNULLATA (" + S.annullata + ")" : gravi.length ? "DA VERIFICARE (" + gravi.length + " eventi segnalati)" : "nessuna anomalia"),
+      "Uscite dalla prova: " + c.uscite + ", di cui oltre " + SOGLIA_S + " s: " + (c.lunghe || 0) + " (tempo fuori " + mmss(c.msFuori) + ")",
       "Tentativi di incollare: " + c.incolla,
       "Ripresa dopo ricaricamento: " + c.ricariche,
       "Durata: " + mmss(S.consegna.fine - S.inizio) + (S.consegna.automatica ? " (consegna automatica)" : ""),
@@ -341,7 +371,8 @@
   async function consegna(automatica) {
     if (S.consegna) return;
     clearInterval(timerId);
-    log(automatica ? "Consegna automatica (tempo scaduto)" : "Consegna da parte dello studente");
+    log(S.annullata ? "Consegna forzata (prova annullata)" : automatica ? "Consegna automatica (tempo scaduto)" : "Consegna da parte dello studente");
+    if (inFS()) { try { document.exitFullscreen ? document.exitFullscreen() : document.webkitExitFullscreen(); } catch (e) {} }
     const fine = Date.now(), risposte = stringaRisposte();
     const ricevuta = (await sha(S.matricola + "|" + risposte + "|" + fine)).slice(0, 8).toUpperCase().replace(/(.{4})/, "$1-");
     S.consegna = { fine, ricevuta, automatica, inviato: false, tentativi: 0, risposte, riepilogo: "", ambiente: ambiente(), sigla: X.sigla + " – " + X.titolo };
@@ -361,8 +392,8 @@
     try {
       await fetch(f.action, { method: "POST", mode: "no-cors", body: p });
       C.inviato = true; salva();
-      $("fine-titolo").textContent = "Prova consegnata";
-      $("fine-testo").textContent = "Le tue risposte sono arrivate alla docente. Conserva il codice di ricevuta qui sotto.";
+      $("fine-titolo").textContent = S.annullata ? "Prova annullata" : "Prova consegnata";
+      $("fine-testo").textContent = S.annullata ? "Sei uscito dalla prova troppe volte (" + S.annullata + "). Le risposte sono state inviate alla docente, che deciderà come procedere." : "Le tue risposte sono arrivate alla docente. Conserva il codice di ricevuta qui sotto.";
       $("btn-esci").hidden = false;
     } catch (e) {
       $("fine-titolo").textContent = "Invio non riuscito";
@@ -379,6 +410,6 @@
   }
   $("btn-riprova").addEventListener("click", invia);
 
-  if (/[?&]reset\b/.test(location.search)) { localStorage.removeItem(CHIAVE); history.replaceState(null, "", location.pathname + (DOC ? "?docente" : "")); }
+  if (/[?&]reset\b/.test(location.search)) { localStorage.removeItem(CHIAVE); history.replaceState(null, "", location.pathname); }
   prepara();
 })();

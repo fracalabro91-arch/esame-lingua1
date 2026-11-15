@@ -20,11 +20,6 @@
     <h1 id="titolo">Esame di Lingua spagnola 1</h1>
     <p class="docente" id="docente"></p>
 
-    <div class="blocco-seb" id="blocco-seb" hidden>
-      <h2>Apri l'esame con Safe Exam Browser</h2>
-      <p>Questa prova si può svolgere solo dentro Safe Exam Browser. Chiudi questa pagina e apri il file d'esame che ti ha indicato la docente.</p>
-    </div>
-
     <form id="form-inizio" autocomplete="off" novalidate>
       <label>Nome e cognome
         <input id="nome" required autocomplete="off" autocorrect="off" autocapitalize="words" spellcheck="false">
@@ -40,7 +35,8 @@
         <h2>Regole della prova</h2>
         <ul>
           <li>Durata: 90 minuti. Allo scadere del tempo la prova viene consegnata automaticamente.</li>
-          <li>Non sono ammessi dizionari, appunti né altri programmi: dalla prova non si esce fino alla consegna.</li>
+          <li>Non sono ammessi dizionari, appunti né altri programmi. La prova si svolge a schermo intero: non uscire fino alla consegna.</li>
+          <li><strong>Uscite:</strong> ogni uscita (altra scheda, altra app, uscita dallo schermo intero) viene registrata. Se rientri entro 10 secondi è tollerata. Alla 3ª uscita di oltre 10 secondi, oppure alla 10ª uscita in tutto, la prova viene annullata e consegnata così com'è.</li>
           <li>Incolla, copia, correttore e tasto destro sono disattivati. Ogni anomalia viene registrata e inviata alla docente.</li>
           <li>Le risposte si salvano da sole. Puoi muoverti liberamente fra le tareas e cambiare le risposte fino alla consegna.</li>
           <li>Gli accenti non tolgono punti; conta la forma corretta della parola.</li>
@@ -48,15 +44,8 @@
         <label class="spunta"><input type="checkbox" id="accetto" required> Ho letto le regole e le accetto</label>
       </div>
 
-      <div id="riquadro-docente" hidden>
-        <label>Password docente <span class="nota">(solo per provare la pagina fuori da Safe Exam Browser)</span>
-          <input id="pwd-docente" type="password" autocomplete="off">
-        </label>
-      </div>
-
       <p class="errore" id="errore-inizio" role="alert"></p>
       <button type="submit" class="primario" id="btn-inizia">Inizia la prova</button>
-      <button type="button" class="link-docente" id="btn-docente" hidden>Accesso docente</button>
     </form>
   </section>
 </main>
@@ -71,6 +60,7 @@
     </div>
     <div class="progresso" aria-live="off"><span id="n-risposte">0</span>/<span id="n-totale">0</span> risposte</div>
     <div class="barra-dx">
+      <span class="uscite" id="uscite"></span>
       <span class="timer" id="timer" aria-live="off">--:--</span>
       <button class="primario piccolo" id="btn-consegna">Consegna</button>
     </div>
@@ -90,7 +80,7 @@
 <!-- Blocco quando si esce -->
 <div id="velo" class="velo" hidden>
   <div class="velo-box">
-    <h2>Sei uscito dalla prova</h2>
+    <h2 id="velo-titolo">Sei uscito dalla prova</h2>
     <p id="velo-testo">L'uscita è stata registrata. Torna alla prova per continuare.</p>
     <button class="primario" id="btn-rientra">Torna alla prova</button>
   </div>
