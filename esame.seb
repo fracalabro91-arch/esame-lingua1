@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>startURL</key><string>https://fracalabro91-arch.github.io/esame-lingua1/</string>
+  <key>quitURL</key><string>https://fracalabro91-arch.github.io/esame-lingua1/fine.html</string>
+  <key>quitURLConfirm</key><false/>
+  <key>allowQuit</key><true/>
+  <key>hashedQuitPassword</key><string>d4a1166a55c88d8a419414c058a2d258a9831b50a19eb98e907957fbf19d71b6</string>
+  <key>sendBrowserExamKey</key><false/>
+  <key>URLFilterEnable</key><true/>
+  <key>URLFilterEnableContentFilter</key><false/>
+  <key>URLFilterRules</key>
+  <array>
+      <dict><key>action</key><integer>1</integer><key>active</key><true/><key>expression</key><string>fracalabro91-arch.github.io</string><key>regex</key><false/></dict>
+      <dict><key>action</key><integer>1</integer><key>active</key><true/><key>expression</key><string>docs.google.com</string><key>regex</key><false/></dict>
+      <dict><key>action</key><integer>1</integer><key>active</key><true/><key>expression</key><string>fonts.googleapis.com</string><key>regex</key><false/></dict>
+      <dict><key>action</key><integer>1</integer><key>active</key><true/><key>expression</key><string>fonts.gstatic.com</string><key>regex</key><false/></dict>
+      <dict><key>action</key><integer>1</integer><key>active</key><true/><key>expression</key><string>api.fontshare.com</string><key>regex</key><false/></dict>
+  </array>
+  <key>newBrowserWindowByLinkPolicy</key><integer>0</integer>
+  <key>newBrowserWindowByScriptPolicy</key><integer>0</integer>
+  <key>allowSpellCheck</key><false/>
+  <key>allowDictionaryLookup</key><false/>
+  <key>enableRightMouse</key><false/>
+  <key>enablePrintScreen</key><false/>
+  <key>allowSwitchToApplications</key><false/>
+  <key>allowPreferencesWindow</key><false/>
+  <key>allowVirtualMachine</key><false/>
+  <key>allowedDisplaysMaxNumber</key><integer>1</integer>
+  <key>browserWindowAllowReload</key><true/>
+  <key>showReloadButton</key><false/>
+  <key>showTaskBar</key><true/>
+  <key>examSessionClearCookiesOnStart</key><true/>
+</dict>
+</plist>
