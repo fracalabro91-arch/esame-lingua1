@@ -8,7 +8,7 @@
   const FS_OK = !SEB && !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
   // Regole di uscita
   const SOGLIA_S = 10;     // uscite fino a 10 secondi: tollerate (solo registrate)
-  const MAX_LUNGHE = 3;    // alla 3ª uscita oltre i 10 secondi la prova è annullata
+  const MAX_LUNGHE = 3;    // alla 3ª uscita oltre i 10 secondi: avviso alla docente (decide lei)
   const MAX_TOTALI = 10;   // oppure alla 10ª uscita in tutto, anche se brevi
 
   let S = null;   // stato salvato
@@ -302,9 +302,13 @@
       log(lunga ? "USCITA LUNGA" : "Uscita breve", motivo + ", fuori per " + mmss(d) + " (lunghe " + S.contatori.lunghe + "/" + MAX_LUNGHE + ", totali " + S.contatori.uscite + "/" + MAX_TOTALI + ")", lunga);
       aggiornaUscite();
       if (S.contatori.lunghe >= MAX_LUNGHE || S.contatori.uscite >= MAX_TOTALI) {
-        S.annullata = S.contatori.lunghe >= MAX_LUNGHE ? MAX_LUNGHE + " uscite di oltre " + SOGLIA_S + " secondi" : MAX_TOTALI + " uscite in totale";
-        log("PROVA ANNULLATA", S.annullata, true);
-        consegna(false); return;
+        if (!S.limite) {
+          S.limite = S.contatori.lunghe >= MAX_LUNGHE ? MAX_LUNGHE + " uscite di oltre " + SOGLIA_S + " secondi" : MAX_TOTALI + " uscite in totale";
+          log("LIMITE DI USCITE SUPERATO", S.limite + " – la docente decide se annullare", true);
+        }
+        $("velo-titolo").textContent = "Limite di uscite superato";
+        $("velo-testo").textContent = "Sei uscito dalla prova troppe volte (" + S.limite + "). La docente è stata avvisata e potrà annullare la prova. Non uscire più.";
+        $("velo").hidden = false; return;
       }
       const restaL = MAX_LUNGHE - S.contatori.lunghe, restaT = MAX_TOTALI - S.contatori.uscite;
       $("velo-titolo").textContent = lunga ? "Attenzione: uscita registrata" : "Sei uscito dalla prova";
@@ -354,7 +358,7 @@
     const n = X.taree.reduce((a, T) => a + compilate(T), 0), tot = X.taree.reduce((a, T) => a + totaleT(T), 0);
     return [
       "Ricevuta: " + S.consegna.ricevuta,
-      "Esito controlli: " + (S.annullata ? "PROVA ANNULLATA (" + S.annullata + ")" : gravi.length ? "DA VERIFICARE (" + gravi.length + " eventi segnalati)" : "nessuna anomalia"),
+      "Esito controlli: " + (S.limite ? "LIMITE USCITE SUPERATO (" + S.limite + ") – decide la docente" : gravi.length ? "DA VERIFICARE (" + gravi.length + " eventi segnalati)" : "nessuna anomalia"),
       "Uscite dalla prova: " + c.uscite + ", di cui oltre " + SOGLIA_S + " s: " + (c.lunghe || 0) + " (tempo fuori " + mmss(c.msFuori) + ")",
       "Tentativi di incollare: " + c.incolla,
       "Ripresa dopo ricaricamento: " + c.ricariche,
@@ -371,7 +375,7 @@
   async function consegna(automatica) {
     if (S.consegna) return;
     clearInterval(timerId);
-    log(S.annullata ? "Consegna forzata (prova annullata)" : automatica ? "Consegna automatica (tempo scaduto)" : "Consegna da parte dello studente");
+    log(automatica ? "Consegna automatica (tempo scaduto)" : "Consegna da parte dello studente");
     if (inFS()) { try { document.exitFullscreen ? document.exitFullscreen() : document.webkitExitFullscreen(); } catch (e) {} }
     const fine = Date.now(), risposte = stringaRisposte();
     const ricevuta = (await sha(S.matricola + "|" + risposte + "|" + fine)).slice(0, 8).toUpperCase().replace(/(.{4})/, "$1-");
@@ -392,8 +396,8 @@
     try {
       await fetch(f.action, { method: "POST", mode: "no-cors", body: p });
       C.inviato = true; salva();
-      $("fine-titolo").textContent = S.annullata ? "Prova annullata" : "Prova consegnata";
-      $("fine-testo").textContent = S.annullata ? "Sei uscito dalla prova troppe volte (" + S.annullata + "). Le risposte sono state inviate alla docente, che deciderà come procedere." : "Le tue risposte sono arrivate alla docente. Conserva il codice di ricevuta qui sotto.";
+      $("fine-titolo").textContent = "Prova consegnata";
+      $("fine-testo").textContent = "Le tue risposte sono arrivate alla docente. Conserva il codice di ricevuta qui sotto.";
       $("btn-esci").hidden = false;
     } catch (e) {
       $("fine-titolo").textContent = "Invio non riuscito";
